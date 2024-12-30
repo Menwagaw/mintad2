@@ -1,2 +1,2 @@
- # Temperature Trend Analysis
+ #Statistical and Geospatial Data Analysis
 
