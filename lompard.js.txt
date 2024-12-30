@@ -1,0 +1,155 @@
+// Load the Lombardy shapefile
+
+// Load an administrative boundaries dataset (e.g., FAO GAUL 2015)
+var regions = ee.FeatureCollection('FAO/GAUL/2015/level1');
+
+// Filter the dataset for Lombardy (Italy)
+var lombardy = regions.filter(ee.Filter.and(
+  ee.Filter.eq('ADM1_NAME', 'Lombardia'), // Region name
+  ee.Filter.eq('ADM0_NAME', 'Italy')     // Country name
+));
+
+var aoi = lombardy;  
+
+// Define the time period
+var start_date = '2010-01-01';
+var end_date = '2024-10-31';
+
+// Load the datasets
+var era5_temp = ee.ImageCollection('ECMWF/ERA5/DAILY')
+    .select('maximum_2m_air_temperature')
+    .filterDate(start_date, end_date)
+    .filterBounds(aoi);
+
+var era5_precip = ee.ImageCollection('ECMWF/ERA5/DAILY')
+    .select('total_precipitation')
+    .filterDate(start_date, end_date)
+    .filterBounds(aoi);
+
+var jra55_temp = ee.ImageCollection('IDAHO_EPSCOR/TERRACLIMATE')
+    .select('tmmx')
+    .filterDate(start_date, end_date)
+    .filterBounds(aoi);
+
+var jra55_precip = ee.ImageCollection('IDAHO_EPSCOR/TERRACLIMATE')
+    .select('pr')
+    .filterDate(start_date, end_date)
+    .filterBounds(aoi);
+
+// Compute monthly averages for temperature
+var era5_monthly_temp = era5_temp.map(function(image) {
+    var month = ee.Date(image.get('system:time_start')).get('month');
+    var year = ee.Date(image.get('system:time_start')).get('year');
+    var date = ee.Date.fromYMD(year, month, 1);
+    return image.set('date', date);
+}).reduce(ee.Reducer.mean()).clip(aoi);
+
+var jra55_monthly_temp = jra55_temp.map(function(image) {
+    var month = ee.Date(image.get('system:time_start')).get('month');
+    var year = ee.Date(image.get('system:time_start')).get('year');
+    var date = ee.Date.fromYMD(year, month, 1);
+    return image.set('date', date);
+}).reduce(ee.Reducer.mean()).clip(aoi);
+
+// Compute monthly averages for precipitation
+var era5_monthly_precip = era5_precip.map(function(image) {
+    var month = ee.Date(image.get('system:time_start')).get('month');
+    var year = ee.Date(image.get('system:time_start')).get('year');
+    var date = ee.Date.fromYMD(year, month, 1);
+    return image.set('date', date);
+}).reduce(ee.Reducer.mean()).clip(aoi);
+
+var jra55_monthly_precip = jra55_precip.map(function(image) {
+    var month = ee.Date(image.get('system:time_start')).get('month');
+    var year = ee.Date(image.get('system:time_start')).get('year');
+    var date = ee.Date.fromYMD(year, month, 1);
+    return image.set('date', date);
+}).reduce(ee.Reducer.mean()).clip(aoi);
+
+// Define visualization parameters
+var vis_params_temp = {
+    min: -10,
+    max: 40,
+    palette: ['blue', 'white', 'red']
+};
+
+var vis_params_precip = {
+    min: 0,
+    max: 200,
+    palette: ['blue', 'white', 'green']
+};
+
+// Visualize the map of Lombardy
+Map.centerObject(aoi, 6);
+Map.addLayer(aoi, {color: 'green'}, 'Lombardy');
+
+// Visualize the monthly average temperature for ERA5 and JRA55
+Map.addLayer(era5_monthly_temp, vis_params_temp, 'ERA5 Monthly Average Temp');
+Map.addLayer(jra55_monthly_temp, vis_params_temp, 'JRA55 Monthly Average Temp');
+
+// Visualize the monthly average precipitation for ERA5 and JRA55
+Map.addLayer(era5_monthly_precip, vis_params_precip, 'ERA5 Monthly Average Precip');
+Map.addLayer(jra55_monthly_precip, vis_params_precip, 'JRA55 Monthly Average Precip');
+
+// Create time series charts for temperature and precipitation
+var chart_temp = ui.Chart.image.series({
+    imageCollection: era5_temp,
+    region: aoi,
+    reducer: ee.Reducer.mean(),
+    scale: 5000,
+    xProperty: 'system:time_start'
+}).setOptions({
+    title: 'Monthly Average Temperature (ERA5)',
+    hAxis: {title: 'Date'},
+    vAxis: {title: 'Temperature (K)'},
+    lineWidth: 1,
+    colors: ['red']
+});
+
+var chart_precip = ui.Chart.image.series({
+    imageCollection: era5_precip,
+    region: aoi,
+    reducer: ee.Reducer.sum(),
+    scale: 5000,
+    xProperty: 'system:time_start'
+}).setOptions({
+    title: 'Monthly Total Precipitation (ERA5)',
+    hAxis: {title: 'Date'},
+    vAxis: {title: 'Precipitation (mm)'},
+    lineWidth: 1,
+    colors: ['blue']
+});
+
+var chart_temp_jra55 = ui.Chart.image.series({
+    imageCollection: jra55_temp,
+    region: aoi,
+    reducer: ee.Reducer.mean(),
+    scale: 5000,
+    xProperty: 'system:time_start'
+}).setOptions({
+    title: 'Monthly Average Temperature (JRA55)',
+    hAxis: {title: 'Date'},
+    vAxis: {title: 'Temperature (C)'},
+    lineWidth: 1,
+    colors: ['green']
+});
+
+var chart_precip_jra55 = ui.Chart.image.series({
+    imageCollection: jra55_precip,
+    region: aoi,
+    reducer: ee.Reducer.sum(),
+    scale: 5000,
+    xProperty: 'system:time_start'
+}).setOptions({
+    title: 'Monthly Total Precipitation (JRA55)',
+    hAxis: {title: 'Date'},
+    vAxis: {title: 'Precipitation (mm)'},
+    lineWidth: 1,
+    colors: ['purple']
+});
+
+// Print the charts to the console
+print(chart_temp);
+print(chart_precip);
+print(chart_temp_jra55);
+print(chart_precip_jra55);
