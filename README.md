@@ -1,2 +1,2 @@
- #Statistical and Geospatial Data Analysis
+ # Statistical and Geospatial Data Analysis
 
